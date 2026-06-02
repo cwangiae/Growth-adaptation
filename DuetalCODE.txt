@@ -1,0 +1,500 @@
+#Models in "Du, T.Y., Qu, L.R., Bradford, M., Manzoni, S., Bai, Edith., Wang, C. Substrate availability modulates the thermal responses of microbial respiration and growth."
+#Code prepared by Tengyue Du, Institute of Applied Ecology, Chinese Academy of Sciences, dutengyue22@mails.ucas.ac.cn
+#########################################################################################################################################################################################
+
+####Linear mixed-effects models (LMMs) used to evaluate the influence of thermal adaptation on soil microbial respiration and growth without or with substrate addition, respectively.
+
+####R packages will be used for modelling analysis:
+library(lme4)
+library(lmerTest)
+library(MuMIn)
+library(LMERConvenienceFunctions)
+library(car)
+library(arm)
+library(writexl)
+
+##Clear the environment
+rm(list = ls())
+
+####r2 function for evaluating models:
+r2.mixed<-function(mF){
+  mFX<-model.matrix(mF)
+  VarF <- var(as.vector(fixef(mF) %*% t(mFX)))
+  VarR<-sum(as.numeric(VarCorr(mF))) 
+  VarResid<-attr(VarCorr(mF), "sc")^2
+  fR2<-VarF/(VarF + VarR + VarResid)
+  rfR2<-(VarF + VarR)/(VarF + VarR + VarResid)
+  list(fR2=fR2,rfR2=rfR2)
+}
+
+
+####vif function for evaluating models:
+
+vif.mer <- function (fit) {
+  ## adapted from rms::vif
+  
+  v <- vcov(fit)
+  nam <- names(fixef(fit))
+  
+  ## exclude intercepts
+  ns <- sum(1 * (nam == "Intercept" | nam == "(Intercept)"))
+  if (ns > 0) {
+    v <- v[-(1:ns), -(1:ns), drop = FALSE]
+    nam <- nam[-(1:ns)]
+  }
+  
+  d <- diag(v)^0.5
+  v <- diag(solve(v/(d %o% d)))
+  names(v) <- nam
+  v
+}
+##############################################################################################################
+
+
+#####Analyzing the data for soil microbial respiration in this study:
+
+#DATASET:
+dat<-read.csv("LMMs.csv", header=T, na.strings=c("NA"))
+dat0<-dat[dat$Substrate=='0',]
+dat1<-dat[dat$Substrate=='1',]
+
+#Change a variable into factor as random effect for spatial autocorrelation:
+dat$Site<-as.factor(dat$Site)
+is.factor(dat$Site)
+dat0$Site<-as.factor(dat0$Site)
+is.factor(dat0$Site)
+dat1$Site<-as.factor(dat1$Site)
+is.factor(dat1$Site) 
+
+
+#Plotting the response variable distributions to look at assumptions of normality:
+hist(dat$Respiration)
+qqnorm(dat$Respiration)
+qqline(dat$Respiration)
+
+hist(dat0$Respiration)
+qqnorm(dat0$Respiration)
+qqline(dat0$Respiration)
+
+hist(dat1$Respiration)
+qqnorm(dat1$Respiration)
+qqline(dat1$Respiration)
+
+#The soil microbial respiration data are natural log transformed to fit a normal distribution:
+dat$LogRespiration<-log(dat$Respiration)
+hist(dat$LogRespiration)
+qqnorm(dat$LogRespiration)
+qqline(dat$LogRespiration)
+
+dat0$LogRespiration<-log(dat0$Respiration)
+hist(dat0$LogRespiration)
+qqnorm(dat0$LogRespiration)
+qqline(dat0$LogRespiration)
+
+dat1$LogRespiration<-log(dat1$Respiration)
+hist(dat1$LogRespiration)
+qqnorm(dat1$LogRespiration)
+qqline(dat1$LogRespiration)
+
+
+#Testing the effect of thermal adaptation on soil microbial respiration without substrate addition:
+m1<-lmer(LogRespiration~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+TN+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m1)
+summary(standardize(m1))
+plot(m1)
+r2.mixed(m1)
+vif.mer(m1)
+vif.mer(standardize(m1))
+AIC(m1)
+AIC(standardize(m1))
+
+###Removing TN from the model because of its high multicollinearity (VIF > 10) in the subsequent analysis:
+m2<-lmer(LogRespiration~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m2)
+summary(standardize(m2))
+plot(m2)
+r2.mixed(m2)
+vif.mer(m2)
+vif.mer(standardize(m2))
+AIC(m2)
+AIC(standardize(m2))
+
+###Removing SOC from the model as it is high correlated with MBC (R2 > 0.5):
+m3<-lmer(LogRespiration~Temp+MAT+MAT:Temp+SWC+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m3)
+summary(standardize(m3))
+plot(m3)
+r2.mixed(m3)
+vif.mer(m3)
+vif.mer(standardize(m3))
+AIC(m3)
+AIC(standardize(m3))
+
+###Removing SWC from the model as it is high correlated with MBC (R2 > 0.5):
+m4<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m4)
+summary(standardize(m4))
+plot(m4)
+r2.mixed(m4)
+vif.mer(m4)
+vif.mer(standardize(m4))
+AIC(m4)
+AIC(standardize(m4))
+
+###Removing pH from the model because of its limited effects on soil microbial respiration:
+m5<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m5)
+summary(standardize(m5))
+plot(m5)
+r2.mixed(m5)
+vif.mer(m5)
+vif.mer(standardize(m5))
+AIC(m5)
+AIC(standardize(m5))
+
+###Removing B_Shannon from the model because of its limited effects on soil microbial respiration:
+m6<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+MBC+F_Shannon+(1|Site),data=dat0)
+summary(m6)
+summary(standardize(m6))
+plot(m6)
+r2.mixed(m6)
+vif.mer(m6)
+vif.mer(standardize(m6))
+AIC(m6)
+AIC(standardize(m6))
+
+###Removing F_Shannon from the model because of its limited effects on soil microbial respiration:
+m7<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+MBC+(1|Site),data=dat0)
+summary(m7)
+summary(standardize(m7))
+plot(m7)
+r2.mixed(m7)
+vif.mer(m7)
+vif.mer(standardize(m7))
+AIC(m7)
+AIC(standardize(m7))
+###############################################################################################
+
+
+
+#Testing the effect of thermal adaptation on soil microbial respiration with substrate addition:
+m8<-lmer(LogRespiration~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+TN+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m8)
+summary(standardize(m8))
+plot(m8)
+r2.mixed(m8)
+vif.mer(m8)
+vif.mer(standardize(m8))
+AIC(m8)
+AIC(standardize(m8))
+
+###Removing TN from the model because of its high multicollinearity (VIF > 10) in the subsequent analysis:
+m9<-lmer(LogRespiration~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m9)
+summary(standardize(m9))
+plot(m9)
+r2.mixed(m9)
+vif.mer(m9)
+vif.mer(standardize(m9))
+AIC(m9)
+AIC(standardize(m9))
+
+###Removing SOC from the model as it is high correlated with MBC:
+m10<-lmer(LogRespiration~Temp+MAT+MAT:Temp+SWC+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m10)
+summary(standardize(m10))
+plot(m10)
+r2.mixed(m10)
+vif.mer(m10)
+vif.mer(standardize(m10))
+AIC(m10)
+AIC(standardize(m10))
+
+###Removing SWC from the model as it is high correlated with MBC:
+m11<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m11)
+summary(standardize(m11))
+plot(m11)
+r2.mixed(m11)
+vif.mer(m11)
+vif.mer(standardize(m11))
+AIC(m11)
+AIC(standardize(m11))
+
+###Removing F_Shannon from the model because of its limited effects on soil microbial respiration:
+m12<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+pH+MBC+B_Shannon+(1|Site),data=dat1)
+summary(m12)
+summary(standardize(m12))
+plot(m12)
+r2.mixed(m12)
+vif.mer(m12)
+vif.mer(standardize(m12))
+AIC(m12)
+AIC(standardize(m12))
+
+###Removing B_Shannon from the model because of its limited effects on soil microbial respiration:
+m13<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+pH+MBC+(1|Site),data=dat1)
+summary(m13)
+summary(standardize(m13))
+plot(m13)
+r2.mixed(m13)
+vif.mer(m13)
+vif.mer(standardize(m13))
+AIC(m13)
+AIC(standardize(m13))
+
+###Removing pH from the model because of its limited effects on soil microbial respiration:
+m14<-lmer(LogRespiration~Temp+MAT+MAT:Temp+Clay+MBC+(1|Site),data=dat1)
+summary(m14)
+summary(standardize(m14))
+plot(m14)
+r2.mixed(m14)
+vif.mer(m14)
+vif.mer(standardize(m14))
+AIC(m14)
+AIC(standardize(m14))
+###Thus, m7 and m14 are used to estimate the effects of thermal adaptation on soil microbial respiration without or with substrate addition, respectively. 
+####################################################################################################################
+
+
+
+#####Analyzing the data for soil microbial growth in this study:
+
+#Plotting the response variable distributions to look at assumptions of normality:
+hist(dat$Growth)
+qqnorm(dat$Growth)
+qqline(dat$Growth)
+
+hist(dat0$Growth)
+qqnorm(dat0$Growth)
+qqline(dat0$Growth)
+
+hist(dat1$Growth)
+qqnorm(dat1$Growth)
+qqline(dat1$Growth)
+
+#The soil microbial growth data are natural log transformed to fit a normal distribution:
+dat$LogGrowth<-log(dat$Growth)
+hist(dat$LogGrowth)
+qqnorm(dat$LogGrowth)
+qqline(dat$LogGrowth)
+
+dat0$LogGrowth<-log(dat0$Growth)
+hist(dat0$LogGrowth)
+qqnorm(dat0$LogGrowth)
+qqline(dat0$LogGrowth)
+
+dat1$LogGrowth<-log(dat1$Growth)
+hist(dat1$LogGrowth)
+qqnorm(dat1$LogGrowth)
+qqline(dat1$LogGrowth)
+
+
+#Testing the effect of thermal adaptation on soil microbial growth without substrate addition:
+m1<-lmer(LogGrowth~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+TN+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m1)
+summary(standardize(m1))
+plot(m1)
+r2.mixed(m1)
+vif.mer(m1)
+vif.mer(standardize(m1))
+AIC(m1)
+AIC(standardize(m1))
+
+###Removing TN from the model because of its high multicollinearity (VIF > 10) in the subsequent analysis:
+m2<-lmer(LogGrowth~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m2)
+summary(standardize(m2))
+plot(m2)
+r2.mixed(m2)
+vif.mer(m2)
+vif.mer(standardize(m2))
+AIC(m2)
+AIC(standardize(m2))
+
+###Removing SOC from the model as it is high correlated with MBC:
+m3<-lmer(LogGrowth~Temp+MAT+MAT:Temp+SWC+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m3)
+summary(standardize(m3))
+plot(m3)
+r2.mixed(m3)
+vif.mer(m3)
+vif.mer(standardize(m3))
+AIC(m3)
+AIC(standardize(m3))
+
+###Removing SWC from the model as it is high correlated with MBC:
+m4<-lmer(LogGrowth~Temp+MAT+MAT:Temp+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m4)
+summary(standardize(m4))
+plot(m4)
+r2.mixed(m4)
+vif.mer(m4)
+vif.mer(standardize(m4))
+AIC(m4)
+AIC(standardize(m4))
+
+###Removing Clay from the model because of its limited effects on soil microbial growth:
+m5<-lmer(LogGrowth~Temp+MAT+MAT:Temp+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat0)
+summary(m5)
+summary(standardize(m5))
+plot(m5)
+r2.mixed(m5)
+vif.mer(m5)
+vif.mer(standardize(m5))
+AIC(m5)
+AIC(standardize(m5))
+
+###Removing F_Shannon from the model because of its limited effects on soil microbial growth:
+m6<-lmer(LogGrowth~Temp+MAT+MAT:Temp+pH+MBC+B_Shannon+(1|Site),data=dat0)
+summary(m6)
+summary(standardize(m6))
+plot(m6)
+r2.mixed(m6)
+vif.mer(m6)
+vif.mer(standardize(m6))
+AIC(m6)
+AIC(standardize(m6))
+
+###Removing B_Shannon from the model because of its limited effects on soil microbial growth:
+m7<-lmer(LogGrowth~Temp+MAT+MAT:Temp+pH+MBC+(1|Site),data=dat0)
+summary(m7)
+summary(standardize(m7))
+plot(m7)
+r2.mixed(m7)
+vif.mer(m7)
+vif.mer(standardize(m7))
+AIC(m7)
+AIC(standardize(m7))
+###############################################################################################
+
+
+
+#Testing the effect of thermal adaptation on soil microbial growth with substrate addition:
+m8<-lmer(LogGrowth~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+TN+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m8)
+summary(standardize(m8))
+plot(m8)
+r2.mixed(m8)
+vif.mer(m8)
+vif.mer(standardize(m8))
+AIC(m8)
+AIC(standardize(m8))
+
+###Removing TN from the model because of its high multicollinearity (VIF > 10) in the subsequent analysis:
+m9<-lmer(LogGrowth~Temp+MAT+MAT:Temp+SWC+Clay+pH+SOC+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m9)
+summary(standardize(m9))
+plot(m9)
+r2.mixed(m9)
+vif.mer(m9)
+vif.mer(standardize(m9))
+AIC(m9)
+AIC(standardize(m9))
+
+###Removing SOC from the model as it is high correlated with MBC:
+m10<-lmer(LogGrowth~Temp+MAT+MAT:Temp+SWC+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m10)
+summary(standardize(m10))
+plot(m10)
+r2.mixed(m10)
+vif.mer(m10)
+vif.mer(standardize(m10))
+AIC(m10)
+AIC(standardize(m10))
+
+###Removing SWC from the model as it is high correlated with MBC:
+m11<-lmer(LogGrowth~Temp+MAT+MAT:Temp+Clay+pH+MBC+B_Shannon+F_Shannon+(1|Site),data=dat1)
+summary(m11)
+summary(standardize(m11))
+plot(m11)
+r2.mixed(m11)
+vif.mer(m11)
+vif.mer(standardize(m11))
+AIC(m11)
+AIC(standardize(m11))
+
+###Removing B_Shannon from the model because of its limited effects on soil microbial growth:
+m12<-lmer(LogGrowth~Temp+MAT+MAT:Temp+Clay+pH+MBC+F_Shannon+(1|Site),data=dat1)
+summary(m12)
+summary(standardize(m12))
+plot(m12)
+r2.mixed(m12)
+vif.mer(m12)
+vif.mer(standardize(m12))
+AIC(m12)
+AIC(standardize(m12))
+
+###Removing F_Shannon from the model because of its limited effects on soil microbial growth:
+m13<-lmer(LogGrowth~Temp+MAT+MAT:Temp+Clay+pH+MBC+(1|Site),data=dat1)
+summary(m13)
+summary(standardize(m13))
+plot(m13)
+r2.mixed(m13)
+vif.mer(m13)
+vif.mer(standardize(m13))
+AIC(m13)
+AIC(standardize(m13))
+
+###Thus, m7 and m13 are used to estimate the effects of thermal adaptation on soil microbial growth without or with substrate addition, respectively. 
+####################################################################################################################
+
+
+
+####Multiple linear regression models (MLRMs) used to assess the main and interactive effects of substrate availability, thermal adaptation and MAT on on soil microbial respiration, growth, and carbon use efficiency.
+
+####R packages will be used for modelling analysis:
+library(broom)
+library(dplyr)
+library(tidyr)
+library(writexl)
+library(sandwich)
+library(lmtest)
+
+##Clear the environment:
+rm(list = ls())
+
+# Load data:
+dat<-read.csv("MLRMs.csv",header=T,na.strings=c("NA"))
+
+# Define variables:
+vars <- c("MAT", "Substrate", "Adaptation", "Respiration", "Growth", "CUE")
+
+# Clean and transform data:
+dat <- dat %>%
+  mutate(across(all_of(vars), as.numeric)) %>%
+  filter(if_all(all_of(vars), ~ !is.na(.))) %>%
+  mutate(c_MAT = MAT - mean(MAT), Respiration_z = as.numeric(scale(Respiration)), Growth_z = as.numeric(scale(Growth)), CUE_z = as.numeric(scale(CUE)))
+
+# Fit standardized response models:
+m_Respiration_z <- lm(Respiration_z ~ Substrate * Adaptation * c_MAT, data = dat)
+m_Growth_z <- lm(Growth_z ~ Substrate * Adaptation * c_MAT, data = dat)
+m_CUE_z <- lm(CUE_z ~ Substrate * Adaptation * c_MAT, data = dat)
+
+# Extract HC3 robust results:
+extract_hc3_results <- function(model, response_name) {
+  vcov_hc3 <- vcovHC(model, type = "HC3")
+  coef_table <- tidy(coeftest(model, vcov. = vcov_hc3))
+  ci_table <- as.data.frame(coefci(model, vcov. = vcov_hc3, level = 0.95))
+  ci_table$term <- rownames(ci_table)
+  names(ci_table)[1:2] <- c("conf.low", "conf.high")
+  coef_table %>%
+    left_join(ci_table, by = "term") %>%
+    mutate(Response = response_name, R2 = summary(model)$r.squared, Adjusted_R2 = summary(model)$adj.r.squared, Response_scale = "Standardized response: z-score") %>%
+    select(Response, Response_scale, Term = term, Estimate = estimate, `Std. Error` = std.error, `t value` = statistic, `Pr(>|t|)` = p.value, R2, Adjusted_R2, conf.low, conf.high)
+}
+
+# Combine model results:
+coef_all_z <- bind_rows(extract_hc3_results(m_Respiration_z, "Respiration"), extract_hc3_results(m_Growth_z, "Growth"), extract_hc3_results(m_CUE_z, "CUE"))
+
+# Separate result tables:
+Respiration_table_z <- filter(coef_all_z, Response == "Respiration")
+Growth_table_z <- filter(coef_all_z, Response == "Growth")
+CUE_table_z <- filter(coef_all_z, Response == "CUE")
+
+
+
+#########################################################################################################################################################################################
+#END CODE
+#########################################################################################################################################################################################
+
