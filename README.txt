@@ -1,0 +1,3 @@
+The data and code for the manuscript "Substrate availability modulates the thermal responses of microbial respiration and growth".
+
+﻿Data Use Statement: The data presented in this Excel file are provided exclusively to support the reproducibility of the results reported in this study. Any additional analysis, reuse, or publication of these data requires prior approval from the corresponding author (Chao Wang, cwang@iae.ac.cn).
